@@ -71,7 +71,7 @@ def parse_idTrain(id_):
     fs.write(rec + '\n')
 
 # Lưu dữ liệu ngẫu nhiên dưới dạng JSON
-fs = open('random_training_data.json', 'w')
+fs = open('/mnt/data1tb/BRIOS/dataTrain/random_training_data.json', 'w')
 all_len = traindatasets_valuesF.shape[2]
 print('Save random training dataset as JSON: ')
 for id_ in tqdm(range(all_len)):

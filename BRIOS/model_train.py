@@ -17,7 +17,7 @@ def savePreprocessedData(path, data):
         np.save(outfile, data)
 
 # parameter setting
-epochs = 100
+epochs = 10
 batch_size = 1024
 model_name = 'brios'
 hid_size = 96
@@ -50,7 +50,7 @@ def trainModel():
     scheduler = StepLR(optimizer, step_size=50, gamma=0.5)
 
     # load training data
-    train_path = '/mnt/storage/NDVIReconstruct/BRIOS/random_training_data.json'
+    train_path = '/mnt/data1tb/BRIOS/dataTrain/random_training_data.json'
     data_iter = batch_data_loader.get_train_loader(batch_size=batch_size, prepath=train_path)
 
     for epoch in range(epochs):
@@ -67,7 +67,7 @@ def trainModel():
 
             data = utils.to_var(data)
             ret = model.run_on_batch(data, optimizer, epoch)
-            print(f'ret .........{ret}')
+            # print(f'ret .........{ret}')
             run_loss += ret['loss'].item()
 
             eval_masks = ret['eval_masks'].data.cpu().numpy()

@@ -34,12 +34,12 @@ def ExecuteModel():
     if torch.cuda.is_available():
         model = model.cuda()
 
-    SavePath = '**/**.pt'  #Model parameter path
+    SavePath = '/mnt/data1tb/BRIOS/BRIOS/test.pt'  #Model parameter path
 
     model.load_state_dict(torch.load(SavePath))
 
     # load input data
-    data_path = '**/**.json'
+    data_path = '/mnt/data1tb/BRIOS/dataTrain/random_training_data.json'
     data_iter = batch_data_loader.get_test_loader(batch_size=batch_size, prepath=data_path)
 
     model.eval()
@@ -69,11 +69,13 @@ def ExecuteModel():
         if count_ones != 0:
             imputation_fill = imputation[np.where(masks == 0)]
             save_impute.append(imputation_fill)
-        del eval_, eval_masks, imputation, imputation_fill, masks
+            del eval_, eval_masks, imputation, imputation_fill, masks
+        del eval_, eval_masks, imputation, masks
 
     evals = np.asarray(evals)
     imputations = np.asarray(imputations)
 
+    print(f"======================={evals.size}")
     if evals.size != 0:
         print('MAE', np.abs(evals - imputations).mean())
         print('RMSE', sqrt(metrics.mean_squared_error(evals, imputations)))
@@ -87,7 +89,7 @@ def ExecuteModel():
     else:
         save_impute = np.asarray(save_impute, dtype=object)
 
-    resultpath = '**/**'   #predicted values save path
+    resultpath = '/mnt/data1tb/BRIOS/dataTrain/res.npy'   #predicted values save path
     np.save(resultpath, save_impute)
 
     del save_impute, data_iter, data, ret, model
