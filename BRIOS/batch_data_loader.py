@@ -44,7 +44,7 @@ def collate_fn(recs):
     forward = list(map(lambda x: x['forward'], recs))
     backward = list(map(lambda x: x['backward'], recs))
     # normalize SAR data
-    scaler = MinMaxScaler(feature_range=[-1, 1])
+    scaler = MinMaxScaler(feature_range=(-1, 1))
 
     def to_tensor_dict(recs):
 

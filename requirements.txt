@@ -1,0 +1,8 @@
+torch
+scipy
+tqdm
+scikit-learn
+pandas
+ujson
+osgeo 
+gdal

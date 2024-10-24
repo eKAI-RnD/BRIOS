@@ -6,6 +6,14 @@ import ujson as json
 from tqdm import tqdm
 
 def import_data(path):
+    """import data from GEO TIFF
+
+    Args:
+        path (string): path to geo tiff image
+
+    Returns:
+        bands_data (np.array): image with shape (w, h, bands)
+    """
     raster_dataset = gdal.Open(path, gdal.GA_ReadOnly)
     bands_data = []
     for b in range(1, raster_dataset.RasterCount + 1):
@@ -15,7 +23,14 @@ def import_data(path):
     return bands_data
 
 def write_geotiff(fname, data, geo_transform, projection):
-    """Create a GeoTIFF file with the given data."""
+    """ Write data to geo tiff image 
+
+    Args:
+        fname (string): file name 
+        data (np.array): raster array
+        geo_transform (array): geometry
+        projection (string): projection (eg: 4326)
+    """
     driver = gdal.GetDriverByName('ENVI')
     rows, cols, nbands = data.shape[:3]
     # rows, cols = data.shape[:3]
@@ -32,6 +47,14 @@ def write_geotiff(fname, data, geo_transform, projection):
     del dataset
 
 def get_consecutive_count(origin):
+    """ count consecutive value
+
+    Args:
+        origin (array): origin array input
+
+    Returns:
+        output (array): array contains the consecutive value
+    """
     origin = origin.tolist()
     g = [origin[:1]]
     [g[-1].append(y) if x == y else g.append([y]) for x, y in zip(origin[:-1], origin[1:])]
@@ -50,6 +73,15 @@ def get_consecutive_count(origin):
     return output
 
 def cal_timestep(time, mask):
+    """calculate timestep (between step t to step t-i nearest without cloud)
+
+    Args:
+        time (_type_): _description_
+        mask (_type_): _description_
+
+    Returns:
+        deltaT: timestep
+    """
     deltaT = time.copy()
     for i in range(len(time)):
         T_time0 = time[i]
@@ -69,6 +101,12 @@ def cal_timestep(time, mask):
     return deltaT
 
 def savePreprocessedData(path, data):
+    """ Save preprocessed Data to npy array
+
+    Args:
+        path (string): path to shape data
+        data (array): array input
+    """
     with open(path +".npy", 'bw') as outfile:
         np.save(outfile, data)
 
@@ -124,10 +162,10 @@ train_index = np.random.choice(idx.flatten(), size=800000, replace=False)
 savePreprocessedData("**\**",train_index)
 
 # use prepared training data splitting file
-# train_index = np.load("**\**")
-# trainmask = np.zeros(n_samples)
-# trainmask[train_index] = 1
-# trainmask = trainmask.reshape((rows, cols))
+train_index = np.load("**\**")
+trainmask = np.zeros(n_samples)
+trainmask[train_index] = 1
+trainmask = trainmask.reshape((rows, cols))
 
 # processing large areas in blocks, Partition the dataset in advance by spatial blocks
 batch_flag = ['1','2','3','4']
@@ -147,19 +185,24 @@ traindatasets_deltaF = np.empty((n_bands, 3, 0),dtype=np.float16)
 traindatasets_deltaBF = np.empty((n_bands, 3, 0),dtype=np.float16)
 
 for kk in range(len(batch_flag)):
+    # load data
     ndvi_data_path = r"**\**"+batch_flag[kk]
     vh_data_path = r"**\**"+batch_flag[kk]
     rvi_data_path = r"**\**"+batch_flag[kk]
 
+    # tiff to raster
     ndvi_data = import_data(ndvi_data_path)
     vh_data = import_data(vh_data_path)
     rvi_data = import_data(rvi_data_path)
 
+    # image shape
     rows0, cols0, n_bands0 = ndvi_data.shape
 
+    # cloud mask, train mask ?? 
     cloudmask0 = cloudmask[y1[kk]:y2[kk],x1[kk]:x2[kk],:]
     trainmask0 = trainmask[y1[kk]:y2[kk],x1[kk]:x2[kk]]
 
+    # reshape data, get index
     n_samples0 = rows0 * cols0
     ndvi_data0 = ndvi_data.reshape((n_samples0, n_bands0))
     vh_data0 = vh_data.reshape((n_samples0, n_bands0))
@@ -169,8 +212,10 @@ for kk in range(len(batch_flag)):
     train_index0 = np.where(trainmask_arr == 1)
     train_index0 = train_index0[0]
 
+    # remove array not use
     del ndvi_data,vh_data,rvi_data,cloudmask0,trainmask0
 
+    # get data train
     ndvi_dataT = ndvi_data0[train_index0, :]
     vh_dataT = vh_data0[train_index0, :]
     rvi_dataT = rvi_data0[train_index0, :]
@@ -178,8 +223,10 @@ for kk in range(len(batch_flag)):
     maskT =  np.where(cloudmask_arrT == 0, 1, 0)
     eval_maskT = np.where(cloudmask_arrT == 2, 1, 0)
 
+    # remove array not use
     del ndvi_data0,vh_data0,rvi_data0,cloudmask_arr
 
+    # gen time interval for training forward
     print('Generate time interval for training dataset: ')
     deltaT = np.zeros((len(train_index0), n_bands0))
     for i in tqdm(range(len(train_index0))):
@@ -187,6 +234,7 @@ for kk in range(len(batch_flag)):
         done = cal_timestep(time, maskone)
         deltaT[i, :] = done
 
+    # gen time interval for training backward
     print('Generate backward time interval for training dataset: ')
     deltaTb = np.zeros((len(train_index0), n_bands0))
     for i in tqdm(range(len(train_index0))):
@@ -195,6 +243,7 @@ for kk in range(len(batch_flag)):
         done = cal_timestep(time, maskone)
         deltaTb[i, :] = done
 
+    # gen time interval for SAR 
     print('Generate time interval for SAR data: ')
     deltaTt = np.zeros((len(train_index0), n_bands0))
     for i in tqdm(range(len(train_index0))):
@@ -203,6 +252,7 @@ for kk in range(len(batch_flag)):
         done = cal_timestep(time, maskone)
         deltaTt[i, :] = done
 
+    # create training dataset
     print('Generate training dataset: ')
     traindatasets_values = np.zeros((n_bands0, feature_num, len(train_index0)),dtype=np.float16)
     for i in tqdm(range(n_bands0)):
@@ -211,6 +261,7 @@ for kk in range(len(batch_flag)):
             traindatasets_values[i, 1, k] = rvi_dataT[k, i]
             traindatasets_values[i, 2, k] = ndvi_dataT[k, i]
     traindatasets_valuesF = np.concatenate((traindatasets_valuesF, traindatasets_values), axis=2)
+    # remove array not use 
     del vh_dataT,rvi_dataT,ndvi_dataT
 
     print('Generate evalmask: ')  #evalmask: where is the validation/simulated data used as evaluation

@@ -41,7 +41,7 @@ def trainModel():
 
     # Early Stopping (initialize the early_stopping object)
     # early stopping patience; how long to wait after last time validation loss improved.
-    SavePath = '**/**.pt'  #Model parameter save path
+    SavePath = 'test.pt'  #Model parameter save path
     patience = 20
     early_stopping = EarlyStopping(savepath=SavePath, patience=patience, verbose=True,
                                    useralystop=False, delta=0.001)
@@ -50,7 +50,7 @@ def trainModel():
     scheduler = StepLR(optimizer, step_size=50, gamma=0.5)
 
     # load training data
-    train_path = '**/**.json'
+    train_path = '/mnt/storage/NDVIReconstruct/BRIOS/random_training_data.json'
     data_iter = batch_data_loader.get_train_loader(batch_size=batch_size, prepath=train_path)
 
     for epoch in range(epochs):
@@ -67,7 +67,7 @@ def trainModel():
 
             data = utils.to_var(data)
             ret = model.run_on_batch(data, optimizer, epoch)
-
+            print(f'ret .........{ret}')
             run_loss += ret['loss'].item()
 
             eval_masks = ret['eval_masks'].data.cpu().numpy()
