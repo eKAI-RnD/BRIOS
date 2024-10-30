@@ -5,7 +5,6 @@ from tqdm import tqdm
 
 
 
-
 # Cac function can dung
 def parse_rec(values, masks, eval_masks, deltas):
     rec = []
@@ -71,56 +70,36 @@ def generate_random_data(shape):
 
 
 
-# Parameters
-# rows = 10  # number of rows in the image
-# cols = 10  # number of columns in the image
-n_bands = 46  # number of bands in the image
-n_samples = 100
-# n_samples = rows * cols
+
+# parameters
+n_bands = 46
+n_samples = 160740
+
+# load train_index
+dir = "/mnt/data1tb/BRIOS/dataTrain/"
+
+train_index = np.load(dir + "train_index.npy")
+cloudmask = np.load(dir + "cloudmask.npy")
+# print(train_index)
 
 
-"""
-Model yêu cầu 5 features: cloudmask, areamask, ndvi, rvi, vh
-Vì ban đầu đã fill hết mây nên set up cloudmask = 0 (không có mây) và areamask = 1 (có data)
-"""
+# trainmask to select samples to train
+trainmask = np.zeros(n_samples)
+trainmask[train_index] = 1
 
-
-
-# Generate the cloudmask where all values are 0 (clear observations, no clouds)
-cloudmask = np.zeros((n_samples, n_bands), dtype=np.int8)  # All clear, no clouds
-print(f'cloudmask shape: {cloudmask.shape}')
-
-# Generate the areamask based on the condition (0-invalid/no data if cloudmask == 1 or 2, otherwise 1-valid)
-# Since all cloudmask values are 0 (clear), all values in areamask will be 1 (valid)
-areamask = np.ones(n_samples, dtype=np.int8)  # All valid data
-print(f'area mask shape: {areamask.shape}')
-
-# Count the number of clear observations (cloudmask == 0) per pixel
-datanum = np.full(n_samples, n_bands, dtype=np.int8)  # All pixels have all clear observations
-print(f'Number of clear observations per pixel: {datanum[:10]} (showing first 10 samples)')
-
-# Select indices for training where areamask is not 0 and there are more than 25 clear observations
-idx = np.argwhere((areamask != 0) & (datanum > 25)).flatten()
-train_index = np.random.choice(idx, size=len(idx), replace=False)
-
-print(f'Number of selected training samples: {len(train_index)}')
-
-# Generate the training mask based on selected training indices
-trainmask = np.zeros(n_samples, dtype=np.int8)  # Flattened
-trainmask[train_index] = 1  # Mark the selected training samples
-print(f'trainmask shape: {trainmask.shape}')
+# print(trainmask)
 
 
 
 
 
-
-
-
-
-# Sinh các dữ liệu ngẫu nhiên cho từng batch
 feature_num = 3
 time = np.arange(1, 736, 16)
+
+
+
+
+
 
 
 # Khoi tao mang numpy de luu value của 5 features
@@ -132,10 +111,13 @@ traindatasets_deltaBF = np.empty((n_bands, 3, 0),dtype=np.float16)
 
 
 
+
+
+
 # ndvi, vh, rvi path
-ndvi_data_path = '/mnt/data1tb/BRIOS/dataTrain/normNDVI_cut.npy'
-vh_data_path = '/mnt/data1tb/BRIOS/dataTrain/normVH_cut.npy'
-rvi_data_path = '/mnt/data1tb/BRIOS/dataTrain/normRVI_cut.npy'
+ndvi_data_path = '/mnt/data1tb/BRIOS/data2/numpy_data/ndvi.npy'
+vh_data_path = '/mnt/data1tb/BRIOS/data2/numpy_data/vh.npy'
+rvi_data_path = '/mnt/data1tb/BRIOS/data2/numpy_data/rvi.npy'
 
 # Load data from the .npy files
 ndvi_data = np.load(ndvi_data_path)
@@ -165,7 +147,8 @@ cloudmask_arrT = cloudmask_arr[train_index0, :]
 maskT =  np.where(cloudmask_arrT == 0, 1, 0)
 eval_maskT = np.where(cloudmask_arrT == 2, 1, 0)
 
-print(eval_maskT)
+print(ndvi_dataT[:5, :10])
+print(maskT[:5, :10])
 
 
 # gen time interval for training forward
@@ -241,29 +224,10 @@ traindatasets_deltaBF = np.concatenate((traindatasets_deltaBF, traindatasets_del
 
 
 
-
-
-
-
-
-# # Khởi tạo các mảng dữ liệu huấn luyện
-# traindatasets_valuesF = np.random.rand(n_bands, feature_num, 100).astype(np.float16)
-# traindatasets_evalmaskF = np.random.randint(0, 2, (n_bands, 100)).astype(np.int8)
-# traindatasets_maskF = np.random.randint(0, 2, (n_bands, 100)).astype(np.int8)
-# traindatasets_deltaF = np.random.rand(n_bands, feature_num, 100).astype(np.float16)
-# traindatasets_deltaBF = np.random.rand(n_bands, feature_num, 100).astype(np.float16)
-
-
-
-
-
-
-
-
-# Lưu dữ liệu ngẫu nhiên dưới dạng JSON
-fs = open('/mnt/data1tb/BRIOS/dataTrain/random_training_data.json', 'w')
+fs = open(dir + 'training_data.json', 'w')
 all_len = traindatasets_valuesF.shape[2]
-print('Save random training dataset as JSON: ')
+print('Save training dataset as JSON: ')
 for id_ in tqdm(range(all_len)):
     parse_idTrain(id_)
 fs.close()
+

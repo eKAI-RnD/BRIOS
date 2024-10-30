@@ -34,12 +34,12 @@ def ExecuteModel():
     if torch.cuda.is_available():
         model = model.cuda()
 
-    SavePath = '/mnt/data1tb/BRIOS/BRIOS/test.pt'  #Model parameter path
+    SavePath = 'test.pt'  #Model parameter path
 
     model.load_state_dict(torch.load(SavePath))
 
     # load input data
-    data_path = '/mnt/data1tb/BRIOS/dataTrain/random_training_data.json'
+    data_path = '/mnt/data1tb/BRIOS/dataTrain/test_data.json'
     data_iter = batch_data_loader.get_test_loader(batch_size=batch_size, prepath=data_path)
 
     model.eval()
@@ -69,7 +69,7 @@ def ExecuteModel():
         if count_ones != 0:
             imputation_fill = imputation[np.where(masks == 0)]
             save_impute.append(imputation_fill)
-            del eval_, eval_masks, imputation, imputation_fill, masks
+            del imputation_fill
         del eval_, eval_masks, imputation, masks
 
     evals = np.asarray(evals)
