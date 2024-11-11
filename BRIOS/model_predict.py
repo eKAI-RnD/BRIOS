@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 # parameter setting
 batch_size = 512
-model_name = 'brios'
+model_name = 'brios_attention'
 hid_size = 96
 SEQ_LEN = 46
 INPUT_SIZE = 3
@@ -34,12 +34,12 @@ def ExecuteModel():
     if torch.cuda.is_available():
         model = model.cuda()
 
-    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/test.pt'  #Model parameter path
+    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/brios_attention/test_attention_batch.pt'  #Model parameter path
 
     model.load_state_dict(torch.load(SavePath))
 
     # load input data
-    data_path = '/mnt/storage/huyekgis/brios/dataTrain/training_data_1.json'
+    data_path = '/mnt/storage/huyekgis/brios/datasets/dataTrain/anphu_kinhmon.json'
     data_iter = batch_data_loader.get_test_loader(batch_size=batch_size, prepath=data_path)
 
     model.eval()
@@ -87,7 +87,7 @@ def ExecuteModel():
     else:
         save_impute = np.asarray(save_impute, dtype=object)
 
-    resultpath = '/mnt/storage/huyekgis/brios/BRIOS/models/test.npy'   #predicted values save path
+    resultpath = '/mnt/storage/huyekgis/brios/BRIOS/results/anphu_haiduong/anphu_attention.npy'   #predicted values save path
     np.save(resultpath, save_impute)
 
     del save_impute, data_iter, data, ret, model
