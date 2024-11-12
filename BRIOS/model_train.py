@@ -21,7 +21,7 @@ def savePreprocessedData(path, data):
 # parameter setting
 epochs = 1000
 batch_size = 1024
-model_name = 'brios'
+model_name = 'brios_attention'
 hid_size = 96
 SEQ_LEN = 46
 INPUT_SIZE = 3
@@ -30,7 +30,7 @@ SELECT_SIZE = 1
 # training process
 def trainModel():
     print('---------------------')
-    print('Start training phase')
+    print(f'Start training model {model_name} phase')
     print('---------------------')
     model = getattr(models, model_name).Model(hid_size, INPUT_SIZE, SEQ_LEN, SELECT_SIZE)
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -40,7 +40,7 @@ def trainModel():
         model = model.cuda()
 
     # Early Stopping setup
-    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/biros_base/test_batch.pt'  # Model parameter save path
+    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/brios_attention/test_wdsz2_attention.pt'  # Model parameter save path
     patience = 20
     early_stopping = EarlyStopping(savepath=SavePath, patience=patience, verbose=True,
                                    useralystop=False, delta=0.001)
@@ -113,7 +113,7 @@ def trainModel():
                 'rmses': rmses
             }
             
-            with open('/mnt/storage/huyekgis/brios/BRIOS/models/history/history_base.json', 'w') as f:
+            with open('/mnt/storage/huyekgis/brios/BRIOS/models/history/history_wdsz2_attention.json', 'w') as f:
                 json.dump(metrics_history, f)
     
     print("Training complete and metrics saved.")

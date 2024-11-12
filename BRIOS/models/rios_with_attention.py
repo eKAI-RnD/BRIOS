@@ -38,7 +38,33 @@ class TemporalDecay(nn.Module):
         gamma = torch.exp(-gamma)
         return gamma
 
+class GlobalAttention(nn.Module):
+    def __init__(self, hidden_size):
+        super(GlobalAttention, self).__init__()
+        self.hidden_size = hidden_size
+        self.attn = nn.Linear(hidden_size * 2, hidden_size)
+        self.v = nn.Parameter(torch.rand(hidden_size))
+    
+    def forward(self, hidden, encoder_outputs):
+        # hidden: (batch_size, hidden_size) - trạng thái hiện tại
+        # encoder_outputs: (batch_size, seq_len, hidden_size) - đầu ra từ encoder
 
+        seq_len = encoder_outputs.size(1)
+        hidden = hidden.unsqueeze(1).repeat(1, seq_len, 1)
+        # Tính điểm số attention
+        energy = torch.tanh(self.attn(torch.cat((hidden, encoder_outputs), 2))) 
+        energy = energy.transpose(1, 2)
+        v = self.v.repeat(encoder_outputs.size(0), 1).unsqueeze(1)
+        energy = torch.bmm(v, energy)
+        
+        # Tính trọng số attention
+        attention_weights = F.softmax(energy, dim=2)
+        
+        # Tính vector ngữ cảnh
+        context = torch.bmm(attention_weights, encoder_outputs)
+        context = context.squeeze(1)
+        
+        return context, attention_weights
 class LocalAttention(nn.Module):
     def __init__(self, rnn_hid_size, window_size, is_predictive, seq_len):
         super(LocalAttention, self).__init__()
@@ -93,7 +119,7 @@ class LocalAttention(nn.Module):
 
 
 class RIOS_H(nn.Module):
-    def __init__(self, rnn_hid_size, SEQ_LEN, SELECT_SIZE, window_size=5, is_predictive=True):
+    def __init__(self, rnn_hid_size, SEQ_LEN, SELECT_SIZE, window_size=2, is_predictive=True):
         super(RIOS_H, self).__init__()
         self.rnn_hid_size = rnn_hid_size
         self.SEQ_LEN = SEQ_LEN
@@ -104,7 +130,8 @@ class RIOS_H(nn.Module):
         
         # Initialize Local Attention with optimized version
         self.attention = LocalAttention(self.rnn_hid_size, self.window_size, self.is_predictive, self.SEQ_LEN)
-
+        self.global_attention = GlobalAttention(self.rnn_hid_size)
+        
     def build(self):
         self.rnn_cell0 = nn.LSTMCell(self.SELECT_SIZE * 2, self.rnn_hid_size)
         self.rnn_cell1 = nn.LSTMCell(self.SELECT_SIZE * 2, self.rnn_hid_size)
