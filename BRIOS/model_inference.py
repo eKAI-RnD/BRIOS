@@ -88,6 +88,7 @@ def ExecuteModel():
     model.load_state_dict(torch.load(SavePath))
 
     # load input data
+
     data_path = '/mnt/storage/huyekgis/brios/datasets/dataTrain/anphu_kinhmon_75.json'
     data_iter = batch_data_loader.get_test_loader(batch_size=batch_size, prepath=data_path)
 
@@ -119,6 +120,7 @@ def ExecuteModel():
     save_impute = np.concatenate(save_impute, axis=0)
 
     resultpath = '/mnt/storage/huyekgis/brios/BRIOS/results/anphu_haiduong/anphu_attention_75'   #predicted values save path
+
     np.save(resultpath, save_impute)
 
     del save_impute, data_iter, data, ret, model
