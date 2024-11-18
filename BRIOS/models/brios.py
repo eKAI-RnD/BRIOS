@@ -4,7 +4,7 @@ import torch.nn as nn
 
 from torch.autograd import Variable
 from torch.nn.parameter import Parameter
-
+import torch.nn.utils as nn_utils
 import math
 from models import rios
 from sklearn import metrics
@@ -77,12 +77,13 @@ class Model(nn.Module):
 
         return ret
 
-    def run_on_batch(self, data, optimizer, epoch=None):
+    def run_on_batch(self, data, optimizer, epoch=None, max_norm=1.0):
         ret = self(data)
 
         if optimizer is not None:
             optimizer.zero_grad()
             ret['loss'].backward()
+            nn_utils.clip_grad_norm_(self.parameters(), max_norm)
             optimizer.step()
 
         return ret

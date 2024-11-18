@@ -87,13 +87,14 @@ def collate_fn(recs):
     ret_dict['is_train'] = torch.FloatTensor(
         list(map(lambda x: x['is_train'], recs)))
 
+    del forward, backward
     return ret_dict
 
 def get_train_loader(batch_size, prepath, shuffle=True):
     data_set = MyTrainSet(prepath)
     data_iter = DataLoader(dataset=data_set, \
                            batch_size=batch_size, \
-                           num_workers=8, \
+                           num_workers=16, \
                            shuffle=shuffle, \
                            pin_memory=True, \
                            collate_fn=collate_fn
@@ -104,7 +105,7 @@ def get_test_loader(batch_size, prepath, shuffle=False):
     data_set = MyTestSet(prepath)
     data_iter = DataLoader(dataset=data_set, \
                            batch_size=batch_size, \
-                           num_workers=8, \
+                           num_workers=16, \
                            shuffle=shuffle, \
                            pin_memory=True, \
                            collate_fn=collate_fn

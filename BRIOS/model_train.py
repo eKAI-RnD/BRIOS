@@ -12,10 +12,10 @@ from math import sqrt
 from sklearn import metrics
 from tqdm import tqdm
 import json
-
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 def savePreprocessedData(path, data):
-    with open(path +".npy", 'bw') as outfile:
+    with open(path + ".npy", 'bw') as outfile:
         np.save(outfile, data)
 
 # parameter setting
@@ -30,7 +30,7 @@ SELECT_SIZE = 1
 # training process
 def trainModel():
     print('---------------------')
-    print(f'Start training model {model_name} phase')
+    print(f'Training model {model_name}')
     print('---------------------')
     model = getattr(models, model_name).Model(hid_size, INPUT_SIZE, SEQ_LEN, SELECT_SIZE)
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -40,16 +40,18 @@ def trainModel():
         model = model.cuda()
 
     # Early Stopping setup
-    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/brios_attention/test_wdsz2_attention.pt'  # Model parameter save path
+    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/brios_attention/base_brios.pt'  # Model parameter save path
     patience = 20
-    early_stopping = EarlyStopping(savepath=SavePath, patience=patience, verbose=True,
-                                   useralystop=False, delta=0.001)
+    early_stopping = EarlyStopping(savepath=SavePath, patience=patience, verbose=True, useralystop=False, delta=0.001)
 
+    # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=0.0008)
-    scheduler = StepLR(optimizer, step_size=50, gamma=0.5)
 
+    # Scheduler: ReduceLROnPlateau
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
     # Load training data
-    train_path = '/mnt/storage/huyekgis/brios/datasets/dataTrain/hiephoa_kinhmon.json'
+    print('Loading data loader...')
+    train_path = '/mnt/storage/huyekgis/brios/datasets/dataTrain/training_data_1.json'
     data_iter = batch_data_loader.get_train_loader(batch_size=batch_size, prepath=train_path)
 
     # Lists to store metrics for each epoch
@@ -57,12 +59,16 @@ def trainModel():
     valid_losses = []
     rmses = []
 
+    # Setup TensorBoard writer
+    writer = SummaryWriter(log_dir="/mnt/storage/huyekgis/brios/BRIOS/models/logs")
+    print('Start Training')
     for epoch in range(epochs):
         model.train()
         run_loss = 0.0
         rmse = 0.0
         validnum = 0.0
-        for idx, data in tqdm(enumerate(data_iter), total=len(data_iter), desc=f'EPOCH[{epoch+1}/{epochs}]'):
+
+        for idx, data in tqdm(enumerate(data_iter), total=len(data_iter), desc=f'EPOCH[{epoch + 1}/{epochs}]'):
             data = utils.to_var(data)
             ret = model.run_on_batch(data, optimizer, epoch)
             run_loss += ret['loss'].item()
@@ -77,7 +83,7 @@ def trainModel():
                 series_b = series_b[np.where(eval_masks == 1)]
                 validnum += 1.0
 
-            if (epoch + 1) % 20 == 0 and count_ones != 0:
+            if (epoch + 1) % 10 == 0 and count_ones != 0:
                 eval_ = ret['evals'].data.cpu().numpy()
                 imputation = ret['imputations'].data.cpu().numpy()
                 eval_ = eval_[np.where(eval_masks == 1)]
@@ -87,14 +93,20 @@ def trainModel():
         # Calculate epoch metrics
         train_loss = run_loss / (idx + 1.0)
         train_losses.append(train_loss)
-        
+
         print("Epochs: ", epoch + 1, " Loss: ", train_loss)
 
-        if (epoch + 1) % 20 == 0:
+        # Log the training loss to TensorBoard
+        writer.add_scalar('Training Loss', train_loss, epoch + 1)
+
+        if (epoch + 1) % 10 == 0:
             validation_rmse = rmse / (validnum + 1e-5)
             rmses.append(validation_rmse)
             print("Epochs: ", epoch + 1, "Validation AUC metrics: ", validation_rmse)
-        
+            
+            # Log the validation RMSE to TensorBoard
+            writer.add_scalar('Validation RMSE', validation_rmse, epoch + 1)
+
         valid_losses.append(train_loss)  # Assuming valid_loss = train_loss in your setup
 
         # Early stopping
@@ -103,22 +115,19 @@ def trainModel():
             print("Early stopping")
             break
 
-        scheduler.step()
+        scheduler.step(train_loss)
 
-        # Save metrics to a JSON file
-        if (epoch + 1) % 20 == 0:
+        # Save metrics to a JSON file every 20 epochs
+        if (epoch + 1) % 10 == 0:
             metrics_history = {
-                'train_losses': train_losses,
-                'valid_losses': valid_losses,
+                'losses': train_losses,
                 'rmses': rmses
             }
-            
             with open('/mnt/storage/huyekgis/brios/BRIOS/models/history/history_wdsz2_attention.json', 'w') as f:
                 json.dump(metrics_history, f)
     
+    writer.close()  # Close the TensorBoard writer
     print("Training complete and metrics saved.")
-
-
 
 if __name__ == '__main__':
     trainModel()

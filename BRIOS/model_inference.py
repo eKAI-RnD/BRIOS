@@ -83,13 +83,13 @@ def ExecuteModel():
     if torch.cuda.is_available():
         model = model.cuda()
 
-    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/brios_attention/test_attention_batch.pt'  #Model parameter path
+    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/brios_attention/base_brios.pt'  #Model parameter path
 
     model.load_state_dict(torch.load(SavePath))
 
     # load input data
 
-    data_path = '/mnt/storage/huyekgis/brios/datasets/dataTrain/anphu_kinhmon_75.json'
+    data_path = '/mnt/storage/huyekgis/brios/datasets/dataTrain/anphu_kinhmon.json'
     data_iter = batch_data_loader.get_test_loader(batch_size=batch_size, prepath=data_path)
 
     model.eval()
@@ -119,7 +119,7 @@ def ExecuteModel():
 
     save_impute = np.concatenate(save_impute, axis=0)
 
-    resultpath = '/mnt/storage/huyekgis/brios/BRIOS/results/anphu_haiduong/anphu_attention_75'   #predicted values save path
+    resultpath = '/mnt/storage/huyekgis/brios/BRIOS/results/anphu_haiduong/base_brios_attention_anphu'   #predicted values save path
 
     np.save(resultpath, save_impute)
 
