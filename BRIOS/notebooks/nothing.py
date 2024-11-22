@@ -43,6 +43,24 @@
 
 import numpy as np 
 
-t = np.load('/mnt/storage/huyekgis/brios/BRIOS/models/test.npy')
+# t = np.load('/mnt/storage/huyekgis/brios/BRIOS/models/test.npy')
 
-print(t[0])
+# print(t[0])
+
+import torch
+
+# Load file .pt
+checkpoint = torch.load("/mnt/storage/huyekgis/brios/BRIOS/models/model_file/biros_base/base_brios.pt")
+
+# Kiểm tra các key trong checkpoint
+print("Keys in checkpoint:", checkpoint.keys())
+
+# In chi tiết từng key
+for key, value in checkpoint.items():
+    print(f"Key: {key}, Type: {type(value)}")
+
+    # Nếu là model_state_dict, in một số layer
+    if key == 'model_state_dict':
+        print("Example layers in model_state_dict:")
+        for layer, weights in list(value.items())[:5]:  # In 5 layer đầu
+            print(f"Layer: {layer}, Weights shape: {weights.shape}")

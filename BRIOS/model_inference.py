@@ -89,7 +89,7 @@ def ExecuteModel():
 
     # load input data
 
-    data_path = '/mnt/storage/huyekgis/brios/datasets/dataTrain/anphu_kinhmon.json'
+    data_path = '/mnt/storage/huyekgis/brios/datasets/dataTrain/anphu_kinhmon_25.json'
     data_iter = batch_data_loader.get_test_loader(batch_size=batch_size, prepath=data_path)
 
     model.eval()
@@ -119,7 +119,7 @@ def ExecuteModel():
 
     save_impute = np.concatenate(save_impute, axis=0)
 
-    resultpath = '/mnt/storage/huyekgis/brios/BRIOS/results/anphu_haiduong/base_brios_attention_anphu'   #predicted values save path
+    resultpath = '/mnt/storage/huyekgis/brios/BRIOS/results/anphu_haiduong/base_brios_attention_anphu_25'   #predicted values save path
 
     np.save(resultpath, save_impute)
 

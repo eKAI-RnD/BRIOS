@@ -191,13 +191,13 @@ class RIOS_H(nn.Module):
 
             h1 = h1 * gamma_h
             inputs = torch.cat([x_c, m_y], dim=1)
-            
+        
             encoder_outputs.append(h1.unsqueeze(1))
             
             if len(encoder_outputs) > 1:
                 encoder_outputs_tensor = torch.cat(encoder_outputs, dim=1) 
-                c0, attn_weights = self.attention(h1, encoder_outputs_tensor)
-            h0, c0 = self.rnn_cell0(inputs, (h0, c0))
+                c1, attn_weights = self.attention(h1, encoder_outputs_tensor)
+            h0, c0 = self.rnn_cell0(inputs, (h1, c1))
             imputations0.append(x_c.unsqueeze(dim=1))
             
 
