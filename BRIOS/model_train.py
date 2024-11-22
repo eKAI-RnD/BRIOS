@@ -13,6 +13,10 @@ from sklearn import metrics
 from tqdm import tqdm
 import json
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+import mlflow
+import mlflow.pytorch
+
+
 
 def savePreprocessedData(path, data):
     with open(path + ".npy", 'bw') as outfile:
@@ -40,7 +44,7 @@ def trainModel():
         model = model.cuda()
 
     # Early Stopping setup
-    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/brios_attention/base_brios.pt'  # Model parameter save path
+    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/brios_attention/base_brios.pt'
     patience = 20
     early_stopping = EarlyStopping(savepath=SavePath, patience=patience, verbose=True, useralystop=False, delta=0.001)
 
@@ -49,73 +53,88 @@ def trainModel():
 
     # Scheduler: ReduceLROnPlateau
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
+    
     # Load training data
     print('Loading data loader...')
     train_path = '/mnt/storage/huyekgis/brios/datasets/dataTrain/training_data_1.json'
     data_iter = batch_data_loader.get_train_loader(batch_size=batch_size, prepath=train_path)
 
-    # Lists to store metrics for each epoch
-    train_losses = []
-    valid_losses = []
-    rmses = []
+    # Start MLflow run
+    with mlflow.start_run():
+        # Log parameters
+        mlflow.log_param("model_name", model_name)
+        mlflow.log_param("hid_size", hid_size)
+        mlflow.log_param("batch_size", batch_size)
+        mlflow.log_param("epochs", epochs)
+        mlflow.log_param("learning_rate", 1e-3)
 
-    # Setup TensorBoard writer
-    writer = SummaryWriter(log_dir="/mnt/storage/huyekgis/brios/BRIOS/models/logs")
-    print('Start Training')
-    for epoch in range(epochs):
-        model.train()
-        run_loss = 0.0
-        rmse = 0.0
-        validnum = 0.0
+        # Lists to store metrics for each epoch
+        train_losses = []
+        valid_losses = []
+        rmses = []
 
-        for idx, data in tqdm(enumerate(data_iter), total=len(data_iter), desc=f'EPOCH[{epoch + 1}/{epochs}]'):
-            data = utils.to_var(data)
-            ret = model.run_on_batch(data, optimizer, epoch)
-            run_loss += ret['loss'].item()
+        # Setup TensorBoard writer
+        writer = SummaryWriter(log_dir="/mnt/storage/huyekgis/brios/BRIOS/models/logs")
+        print('Start Training')
+        for epoch in range(epochs):
+            model.train()
+            run_loss = 0.0
+            rmse = 0.0
+            validnum = 0.0
 
-            eval_masks = ret['eval_masks'].data.cpu().numpy()
-            count_ones = np.count_nonzero(eval_masks == 1)
+            for idx, data in tqdm(enumerate(data_iter), total=len(data_iter), desc=f'EPOCH[{epoch + 1}/{epochs}]'):
+                data = utils.to_var(data)
+                ret = model.run_on_batch(data, optimizer, epoch)
+                run_loss += ret['loss'].item()
 
-            if count_ones != 0:
-                series_f = ret['imputations_f'].data.cpu().numpy()
-                series_b = ret['imputations_b'].data.cpu().numpy()
-                series_f = series_f[np.where(eval_masks == 1)]
-                series_b = series_b[np.where(eval_masks == 1)]
-                validnum += 1.0
+                eval_masks = ret['eval_masks'].data.cpu().numpy()
+                count_ones = np.count_nonzero(eval_masks == 1)
 
-            if (epoch + 1) % 10 == 0 and count_ones != 0:
-                eval_ = ret['evals'].data.cpu().numpy()
-                imputation = ret['imputations'].data.cpu().numpy()
-                eval_ = eval_[np.where(eval_masks == 1)]
-                imputation = imputation[np.where(eval_masks == 1)]
-                rmse += sqrt(metrics.mean_squared_error(eval_, imputation))
+                if count_ones != 0:
+                    series_f = ret['imputations_f'].data.cpu().numpy()
+                    series_b = ret['imputations_b'].data.cpu().numpy()
+                    series_f = series_f[np.where(eval_masks == 1)]
+                    series_b = series_b[np.where(eval_masks == 1)]
+                    validnum += 1.0
 
-        # Calculate epoch metrics
-        train_loss = run_loss / (idx + 1.0)
-        train_losses.append(train_loss)
+                if (epoch + 1) % 10 == 0 and count_ones != 0:
+                    eval_ = ret['evals'].data.cpu().numpy()
+                    imputation = ret['imputations'].data.cpu().numpy()
+                    eval_ = eval_[np.where(eval_masks == 1)]
+                    imputation = imputation[np.where(eval_masks == 1)]
+                    rmse += sqrt(metrics.mean_squared_error(eval_, imputation))
 
-        print("Epochs: ", epoch + 1, " Loss: ", train_loss)
+            # Calculate epoch metrics
+            train_loss = run_loss / (idx + 1.0)
+            train_losses.append(train_loss)
 
-        # Log the training loss to TensorBoard
-        writer.add_scalar('Training Loss', train_loss, epoch + 1)
+            print("Epochs: ", epoch + 1, " Loss: ", train_loss)
 
-        if (epoch + 1) % 10 == 0:
-            validation_rmse = rmse / (validnum + 1e-5)
-            rmses.append(validation_rmse)
-            print("Epochs: ", epoch + 1, "Validation AUC metrics: ", validation_rmse)
-            
-            # Log the validation RMSE to TensorBoard
-            writer.add_scalar('Validation RMSE', validation_rmse, epoch + 1)
+            # Log the training loss to TensorBoard and MLflow
+            writer.add_scalar('Training Loss', train_loss, epoch + 1)
+            mlflow.log_metric("train_loss", train_loss, step=epoch + 1)
 
-        valid_losses.append(train_loss)  # Assuming valid_loss = train_loss in your setup
+            if (epoch + 1) % 10 == 0:
+                validation_rmse = rmse / (validnum + 1e-5)
+                rmses.append(validation_rmse)
+                print("Epochs: ", epoch + 1, "Validation AUC metrics: ", validation_rmse)
+                
+                # Log the validation RMSE to TensorBoard and MLflow
+                writer.add_scalar('Validation RMSE', validation_rmse, epoch + 1)
+                mlflow.log_metric("validation_rmse", validation_rmse, step=epoch + 1)
 
-        # Early stopping
-        early_stopping(train_loss, model)
-        if early_stopping.early_stop:
-            print("Early stopping")
-            break
+            valid_losses.append(train_loss)
 
-        scheduler.step(train_loss)
+            # Early stopping
+            early_stopping(train_loss, model)
+            if early_stopping.early_stop:
+                print("Early stopping")
+                break
+
+            scheduler.step(train_loss)
+
+        # Save the trained model to MLflow
+        mlflow.pytorch.log_model(model, "models")
 
         # Save metrics to a JSON file every 20 epochs
         if (epoch + 1) % 10 == 0:
@@ -125,9 +144,9 @@ def trainModel():
             }
             with open('/mnt/storage/huyekgis/brios/BRIOS/models/history/history_wdsz2_attention.json', 'w') as f:
                 json.dump(metrics_history, f)
-    
-    writer.close()  # Close the TensorBoard writer
-    print("Training complete and metrics saved.")
+        
+        writer.close()  # Close the TensorBoard writer
+        print("Training complete and metrics saved.")
 
 if __name__ == '__main__':
     trainModel()

@@ -1,0 +1,15 @@
+artifact_uri: mlflow-artifacts:/0/76af0fcc14054330bcc3bac4cf592d2a/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 76af0fcc14054330bcc3bac4cf592d2a
+run_name: nimble-crane-250
+run_uuid: 76af0fcc14054330bcc3bac4cf592d2a
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1732248656659
+status: 1
+tags: []
+user_id: nhatvm
