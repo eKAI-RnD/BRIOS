@@ -1,69 +1,13 @@
-# import torch
-# import numpy as np
-# from math import sqrt
-# from sklearn import metrics
-# import utils
-# import models
-# import batch_data_loader
-# from tqdm import tqdm
-# # parameters
-# model_name = 'brios'
-# hid_size = 96
-# SEQ_LEN = 46
-# INPUT_SIZE = 3
-# SELECT_SIZE = 1
-# SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/test.pt'  # Model parameter load path
-
-
-# def load_model():
-#     model = getattr(models, model_name).Model(hid_size, INPUT_SIZE, SEQ_LEN, SELECT_SIZE)
-#     model.load_state_dict(torch.load(SavePath))
-#     model.eval()  # Set model to evaluation mode
-#     if torch.cuda.is_available():
-#         model = model.cuda()
-#     return model
-
-
-# def inference(input_data):
-#     model = load_model()
-#     all_predictions = [] 
-#     with torch.no_grad():  
-#         for idx, data in tqdm(enumerate(input_data), total=len(data_iter)):
-#             data = utils.to_var(data)
-#             ret = model.run_on_batch(data, None)
-#             predictions = ret['imputations'].data.cpu().numpy() 
-#             all_predictions.append(predictions)
-#     # Gộp tất cả predictions lại thành một mảng numpy
-#     all_predictions = np.concatenate(all_predictions, axis=0)
-#     return all_predictions
-
-
-# # Example usage of inference function
-# if __name__ == '__main__':
-#     data_path = '/mnt/storage/huyekgis/brios/dataTrain/anphu_kinhmon.json'
-#     data_iter = batch_data_loader.get_test_loader(batch_size=1024, prepath=data_path)
-#     predictions = inference(data_iter)
-#     np.save('/mnt/storage/huyekgis/brios/BRIOS/models/predictions.npy', predictions)
-
-
-
 import torch
-import torch.optim as optim
-from scipy.stats import pearsonr
-from torch.optim.lr_scheduler import StepLR
 import numpy as np
-from torch.utils.tensorboard import SummaryWriter
 import utils
 import models
-from support.early_stopping import EarlyStopping
 import batch_data_loader
-from math import sqrt
-from sklearn import metrics
 from tqdm import tqdm
 
 # parameter setting
 batch_size = 512
-model_name = 'brios_attention'
+model_name = 'brios'
 hid_size = 96
 SEQ_LEN = 46
 INPUT_SIZE = 3
@@ -83,13 +27,13 @@ def ExecuteModel():
     if torch.cuda.is_available():
         model = model.cuda()
 
-    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/brios_attention/base_brios.pt'  #Model parameter path
+    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/train_largedata/brios_base_retrain.pt'  #Model parameter path
 
     model.load_state_dict(torch.load(SavePath))
 
     # load input data
 
-    data_path = '/mnt/storage/huyekgis/brios/datasets/dataTrain/anphu_kinhmon_25.json'
+    data_path = '/mnt/storage/huyekgis/brios/RAW_TEST_Data/Data4BRIOS_TEST/AnPhus-Pleicu-GiaLai/training_data.json'
     data_iter = batch_data_loader.get_test_loader(batch_size=batch_size, prepath=data_path)
 
     model.eval()
@@ -116,12 +60,35 @@ def ExecuteModel():
     imputations = np.asarray(imputations)
 
     del evals, imputations
-
+    
     save_impute = np.concatenate(save_impute, axis=0)
 
-    resultpath = '/mnt/storage/huyekgis/brios/BRIOS/results/anphu_haiduong/base_brios_attention_anphu_25'   #predicted values save path
+    """
+    convert time series to x y t
+    first: save_impute have shape: like (183744, 46, 1)
+    """
+    save_impute.reshape(save_impute.shape[0], save_impute.shape[1])
 
-    np.save(resultpath, save_impute)
+    ndvi_root = np.load('/mnt/storage/huyekgis/brios/RAW_TEST_Data/Data4BRIOS_TEST/AnPhus-Pleicu-GiaLai/ndvi_timeseries.npy')
+    x, y, t = ndvi_root.shape
+
+    coordinates = np.load('/mnt/storage/huyekgis/brios/RAW_TEST_Data/Data4BRIOS_TEST/AnPhus-Pleicu-GiaLai/coordinates.npy')
+
+    img1 = np.zeros((ndvi_root.shape[0], ndvi_root.shape[1], 46))  # Hoặc np.full((x_size, y_size, 46), np.nan)
+
+    # Gán giá trị từ `save_impute` vào `img1` ở các tọa độ và thời điểm khác nhau
+    for i in range(save_impute.shape[0]):
+        for t in range(save_impute.shape[1]):  # Với `t` là chiều thời gian trong `save_impute`
+            img1[coordinates[i, 0], coordinates[i, 1], t] = save_impute[i, t]
+
+    
+    print(f"result shape: {img1.shape}")
+
+
+
+    resultpath = '/mnt/storage/huyekgis/brios/BRIOS/results/anphu/test_anphu.npy'   #predicted values save path
+
+    np.save(resultpath, img1)
 
     del save_impute, data_iter, data, ret, model
 

@@ -1,3 +1,6 @@
 */results
 /myenv
 /datasets
+*.env
+RAW*
+mlruns

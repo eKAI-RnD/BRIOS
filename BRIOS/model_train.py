@@ -15,7 +15,7 @@ import json
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import mlflow
 import mlflow.pytorch
-
+import logging
 
 
 def savePreprocessedData(path, data):
@@ -31,20 +31,32 @@ SEQ_LEN = 46
 INPUT_SIZE = 3
 SELECT_SIZE = 1
 
-# training process
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('/mnt/storage/huyekgis/brios/BRIOS/models/logs/training_log.log'),  # Đường dẫn file log
+        logging.StreamHandler()  # In ra console
+    ]
+)
+logger = logging.getLogger(__name__)
+logging.info('hihihi')
+print('ffffff')
+# Hàm trainModel
 def trainModel():
-    print('---------------------')
-    print(f'Training model {model_name}')
-    print('---------------------')
+    logger.info('---------------------')
+    logger.info(f'Training model {model_name}')
+    logger.info('---------------------')
+    
     model = getattr(models, model_name).Model(hid_size, INPUT_SIZE, SEQ_LEN, SELECT_SIZE)
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print('Total params is {}'.format(total_params))
+    logger.info('Total params is {}'.format(total_params))
 
     if torch.cuda.is_available():
         model = model.cuda()
 
     # Early Stopping setup
-    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/brios_attention/base_brios.pt'
+    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/brios_attention/brios_attention_2.pt'
     patience = 20
     early_stopping = EarlyStopping(savepath=SavePath, patience=patience, verbose=True, useralystop=False, delta=0.001)
 
@@ -52,10 +64,14 @@ def trainModel():
     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=0.0008)
 
     # Scheduler: ReduceLROnPlateau
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
+    #scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.1, patience=10, verbose=True
+    )
+
     
     # Load training data
-    print('Loading data loader...')
+    logger.info('Loading data loader...')
     train_path = '/mnt/storage/huyekgis/brios/datasets/dataTrain/training_data_1.json'
     data_iter = batch_data_loader.get_train_loader(batch_size=batch_size, prepath=train_path)
 
@@ -74,8 +90,8 @@ def trainModel():
         rmses = []
 
         # Setup TensorBoard writer
-        writer = SummaryWriter(log_dir="/mnt/storage/huyekgis/brios/BRIOS/models/logs")
-        print('Start Training')
+        logger.info('Start Training')
+
         for epoch in range(epochs):
             model.train()
             run_loss = 0.0
@@ -108,19 +124,17 @@ def trainModel():
             train_loss = run_loss / (idx + 1.0)
             train_losses.append(train_loss)
 
-            print("Epochs: ", epoch + 1, " Loss: ", train_loss)
+            logger.info(f"Epochs: {epoch + 1}, Loss: {train_loss}")
 
             # Log the training loss to TensorBoard and MLflow
-            writer.add_scalar('Training Loss', train_loss, epoch + 1)
             mlflow.log_metric("train_loss", train_loss, step=epoch + 1)
 
             if (epoch + 1) % 10 == 0:
                 validation_rmse = rmse / (validnum + 1e-5)
                 rmses.append(validation_rmse)
-                print("Epochs: ", epoch + 1, "Validation AUC metrics: ", validation_rmse)
+                logger.info(f"Epochs: {epoch + 1}, Validation AUC metrics: {validation_rmse}")
                 
                 # Log the validation RMSE to TensorBoard and MLflow
-                writer.add_scalar('Validation RMSE', validation_rmse, epoch + 1)
                 mlflow.log_metric("validation_rmse", validation_rmse, step=epoch + 1)
 
             valid_losses.append(train_loss)
@@ -128,7 +142,7 @@ def trainModel():
             # Early stopping
             early_stopping(train_loss, model)
             if early_stopping.early_stop:
-                print("Early stopping")
+                logger.info("Early stopping")
                 break
 
             scheduler.step(train_loss)
@@ -145,8 +159,7 @@ def trainModel():
             with open('/mnt/storage/huyekgis/brios/BRIOS/models/history/history_wdsz2_attention.json', 'w') as f:
                 json.dump(metrics_history, f)
         
-        writer.close()  # Close the TensorBoard writer
-        print("Training complete and metrics saved.")
+        logger.info("Training complete and metrics saved.")
 
 if __name__ == '__main__':
     trainModel()
