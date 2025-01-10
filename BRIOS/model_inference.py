@@ -27,13 +27,13 @@ def ExecuteModel():
     if torch.cuda.is_available():
         model = model.cuda()
 
-    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/train_largedata/brios_base_retrain.pt'  #Model parameter path
+    SavePath = '/mnt/storage/code/EOV_NDVI/brios/BRIOS/models/model_file/train_largedata/brios_base_extreme.pt'  #Model parameter path
 
     model.load_state_dict(torch.load(SavePath))
 
     # load input data
 
-    data_path = '/mnt/storage/huyekgis/brios/RAW_TEST_Data/Data4BRIOS_TEST/AnPhus-Pleicu-GiaLai/training_data.json'
+    data_path = '/mnt/storage/code/EOV_NDVI/brios/datasets/Train_LST/ThuyVan-ThaiThuy-ThaiBinh/training_data.json'
     data_iter = batch_data_loader.get_test_loader(batch_size=batch_size, prepath=data_path)
 
     model.eval()
@@ -69,10 +69,10 @@ def ExecuteModel():
     """
     save_impute.reshape(save_impute.shape[0], save_impute.shape[1])
 
-    ndvi_root = np.load('/mnt/storage/huyekgis/brios/RAW_TEST_Data/Data4BRIOS_TEST/AnPhus-Pleicu-GiaLai/ndvi_timeseries.npy')
+    ndvi_root = np.load('/mnt/storage/code/EOV_NDVI/brios/datasets/Train_LST/ThuyVan-ThaiThuy-ThaiBinh/ndvi_timeseries.npy')
     x, y, t = ndvi_root.shape
 
-    coordinates = np.load('/mnt/storage/huyekgis/brios/RAW_TEST_Data/Data4BRIOS_TEST/AnPhus-Pleicu-GiaLai/coordinates.npy')
+    coordinates = np.load('/mnt/storage/code/EOV_NDVI/brios/datasets/Train_LST/ThuyVan-ThaiThuy-ThaiBinh/coordinates.npy')
 
     img1 = np.zeros((ndvi_root.shape[0], ndvi_root.shape[1], 46))  # Hoặc np.full((x_size, y_size, 46), np.nan)
 
@@ -86,7 +86,7 @@ def ExecuteModel():
 
 
 
-    resultpath = '/mnt/storage/huyekgis/brios/BRIOS/results/anphu/test_anphu.npy'   #predicted values save path
+    resultpath = '/mnt/storage/code/EOV_NDVI/brios/datasets/Train_LST/ThuyVan-ThaiThuy-ThaiBinh/infer_thuyvan.npy'   #predicted values save path
 
     np.save(resultpath, img1)
 

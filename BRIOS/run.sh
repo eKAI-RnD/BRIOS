@@ -10,4 +10,4 @@
 # python3 /mnt/storage/huyekgis/brios/BRIOS/preprocess/prepare_train_data.py
 
 echo "train"
-python3 /mnt/storage/huyekgis/brios/BRIOS/model_train.py
+python3 /mnt/storage/code/EOV_NDVI/brios/BRIOS/model_train.py

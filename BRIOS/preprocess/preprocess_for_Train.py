@@ -351,13 +351,13 @@ def create_json_data(dir):
         fillNA(rvi_data_path=rvi_time_series_path, vh_data_path=vh_time_series_path,
         rvi_full_path=rvi_time_series_path, vh_full_path=vh_time_series_path)
         
-    missing_date, date_rvi = find_missing_date(os.listdir(ndvi_raster_path), os.listdir(sar_raster_path))
-    print(missing_date)
-    create_ndvi_time_series(folder_path=ndvi_raster_path, output_path=ndvi_time_series_path, missing_dates=missing_date, date_rvi=date_rvi)
-    create_sar_time_series(folder_path=sar_raster_path, output_rvi_path=rvi_time_series_path, output_vh_path=vh_time_series_path)
+    # missing_date, date_rvi = find_missing_date(os.listdir(ndvi_raster_path), os.listdir(sar_raster_path))
+    # print(missing_date)
+    # create_ndvi_time_series(folder_path=ndvi_raster_path, output_path=ndvi_time_series_path, missing_dates=missing_date, date_rvi=date_rvi)
+    # create_sar_time_series(folder_path=sar_raster_path, output_rvi_path=rvi_time_series_path, output_vh_path=vh_time_series_path)
 
-    fillNA(rvi_data_path=rvi_time_series_path, vh_data_path=vh_time_series_path,
-    rvi_full_path=rvi_time_series_path, vh_full_path=vh_time_series_path)
+    # fillNA(rvi_data_path=rvi_time_series_path, vh_data_path=vh_time_series_path,
+    # rvi_full_path=rvi_time_series_path, vh_full_path=vh_time_series_path)
     for region in tqdm(list_region, desc="load region: "):
         ndvi_time_series_path = dir + region + '/ndvi_timeseries.npy'
         rvi_time_series_path = dir + region + '/rvi_timeseries.npy'
@@ -540,4 +540,4 @@ def create_json_data(dir):
 # fillNA(rvi_data_path='/mnt/data1tb/brios/BRIOS/datasets/data2/rvi_timeseries.npy', vh_data_path='/mnt/data1tb/brios/BRIOS/datasets/data2/vh_timeseries.npy',
 #        rvi_full_path='/mnt/data1tb/brios/BRIOS/datasets/dataTrain/rvi_full.npy', vh_full_path='/mnt/data1tb/brios/BRIOS/datasets/dataTrain/vh_full.npy')
 
-create_json_data(dir='/mnt/storage/huyekgis/brios/datasets/TRAINING_Data4BRIOS_4M/')
+create_json_data(dir='/mnt/storage/code/EOV_NDVI/brios/datasets/Train_hiephoa/')

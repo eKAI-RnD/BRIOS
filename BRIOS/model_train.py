@@ -3,7 +3,6 @@ import torch.optim as optim
 from scipy.stats import pearsonr
 from torch.optim.lr_scheduler import StepLR
 import numpy as np
-from torch.utils.tensorboard import SummaryWriter
 import utils
 import models
 from support.early_stopping import EarlyStopping
@@ -12,93 +11,89 @@ from math import sqrt
 from sklearn import metrics
 from tqdm import tqdm
 import json
+import os
+from dotenv import load_dotenv
+import time
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import mlflow
 import mlflow.pytorch
-import logging
+import logging as logging1
 
 
-def savePreprocessedData(path, data):
-    with open(path + ".npy", 'bw') as outfile:
-        np.save(outfile, data)
+load_dotenv()
 
-# parameter setting
+# Load config
+ROOT_PATH_PRJ = os.getenv('ROOT_PATH')
+MODEL_NAME = os.getenv('MODEL_NAME')
+MODEL_SAVE = os.getenv('MODEL_SAVE')
+DATA_TRAIN_PATH = os.getenv('DATA_TRAIN')
+METRIC_SAVE = os.getenv('METRIC_SAVE')
+
+# Parameter setting
 epochs = 1000
 batch_size = 1024
-model_name = 'brios_attention'
 hid_size = 96
 SEQ_LEN = 46
 INPUT_SIZE = 3
 SELECT_SIZE = 1
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('/mnt/storage/huyekgis/brios/BRIOS/models/logs/training_log.log'),  # Đường dẫn file log
-        logging.StreamHandler()  # In ra console
-    ]
-)
-logger = logging.getLogger(__name__)
-logging.info('hihihi')
-print('ffffff')
-# Hàm trainModel
+
+# Training process
 def trainModel():
-    logger.info('---------------------')
-    logger.info(f'Training model {model_name}')
-    logger.info('---------------------')
-    
-    model = getattr(models, model_name).Model(hid_size, INPUT_SIZE, SEQ_LEN, SELECT_SIZE)
+    print('---------------------')
+    print(f'Training model {MODEL_NAME}')
+    print('---------------------')
+    model = getattr(models, MODEL_NAME).Model(hid_size, INPUT_SIZE, SEQ_LEN, SELECT_SIZE)
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    logger.info('Total params is {}'.format(total_params))
+    print('Total params is {}'.format(total_params))
 
     if torch.cuda.is_available():
         model = model.cuda()
 
     # Early Stopping setup
-    SavePath = '/mnt/storage/huyekgis/brios/BRIOS/models/model_file/brios_attention/brios_attention_2.pt'
+    SavePath = MODEL_SAVE  # Model parameter save path
     patience = 20
     early_stopping = EarlyStopping(savepath=SavePath, patience=patience, verbose=True, useralystop=False, delta=0.001)
 
     # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=0.0008)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
 
-    # Scheduler: ReduceLROnPlateau
-    #scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.1, patience=10, verbose=True
-    )
-
-    
     # Load training data
-    logger.info('Loading data loader...')
-    train_path = '/mnt/storage/huyekgis/brios/datasets/dataTrain/training_data_1.json'
+    print("Loading data loader...")
+    train_path = DATA_TRAIN_PATH
+    start_time = time.time()
     data_iter = batch_data_loader.get_train_loader(batch_size=batch_size, prepath=train_path)
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"Data loader execution time: {execution_time:.2f} seconds")
+    # Lists to store metrics for each epoch
+    train_losses = []
+    rmses = []
 
-    # Start MLflow run
-    with mlflow.start_run():
-        # Log parameters
-        mlflow.log_param("model_name", model_name)
-        mlflow.log_param("hid_size", hid_size)
-        mlflow.log_param("batch_size", batch_size)
-        mlflow.log_param("epochs", epochs)
-        mlflow.log_param("learning_rate", 1e-3)
+    # MLflow Experiment
+    with mlflow.start_run() as run:
+        # Log experiment parameters
+        mlflow.log_params({
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "hid_size": hid_size,
+            "SEQ_LEN": SEQ_LEN,
+            "INPUT_SIZE": INPUT_SIZE,
+            "SELECT_SIZE": SELECT_SIZE,
+            "lr": 1e-3,
+            "weight_decay": 0.0008
+        })
 
-        # Lists to store metrics for each epoch
-        train_losses = []
-        valid_losses = []
-        rmses = []
-
-        # Setup TensorBoard writer
-        logger.info('Start Training')
-
+        print("Start training")
         for epoch in range(epochs):
             model.train()
             run_loss = 0.0
             rmse = 0.0
             validnum = 0.0
-
-            for idx, data in tqdm(enumerate(data_iter), total=len(data_iter), desc=f'EPOCH[{epoch + 1}/{epochs}]'):
+            # logging.info(f'EPOCH[{epoch}/{epochs}]')
+            # for idx, data in tqdm(enumerate(data_iter), total=len(data_iter), desc=f'EPOCH[{epoch + 1}/{epochs}]'):
+            for idx, data in tqdm(enumerate(data_iter), total=len(data_iter), desc=f'EPOCH[{epoch}/{epochs}]'):
                 data = utils.to_var(data)
                 ret = model.run_on_batch(data, optimizer, epoch)
                 run_loss += ret['loss'].item()
@@ -113,7 +108,7 @@ def trainModel():
                     series_b = series_b[np.where(eval_masks == 1)]
                     validnum += 1.0
 
-                if (epoch + 1) % 10 == 0 and count_ones != 0:
+                if (epoch + 1) % 20 == 0 and count_ones != 0:
                     eval_ = ret['evals'].data.cpu().numpy()
                     imputation = ret['imputations'].data.cpu().numpy()
                     eval_ = eval_[np.where(eval_masks == 1)]
@@ -124,42 +119,42 @@ def trainModel():
             train_loss = run_loss / (idx + 1.0)
             train_losses.append(train_loss)
 
-            logger.info(f"Epochs: {epoch + 1}, Loss: {train_loss}")
+            print(f"Epoch {epoch + 1}: Loss: {train_loss}")
 
-            # Log the training loss to TensorBoard and MLflow
-            mlflow.log_metric("train_loss", train_loss, step=epoch + 1)
+            # Log metrics to MLflow
+            mlflow.log_metric('train_loss', train_loss, step=epoch + 1)
 
-            if (epoch + 1) % 10 == 0:
+            if (epoch + 1) % 20 == 0:
                 validation_rmse = rmse / (validnum + 1e-5)
                 rmses.append(validation_rmse)
-                logger.info(f"Epochs: {epoch + 1}, Validation AUC metrics: {validation_rmse}")
+                print(f"Epoch {epoch + 1}: Validation RMSE: {validation_rmse}")
                 
-                # Log the validation RMSE to TensorBoard and MLflow
-                mlflow.log_metric("validation_rmse", validation_rmse, step=epoch + 1)
-
-            valid_losses.append(train_loss)
+                # Log validation RMSE to MLflow
+                mlflow.log_metric('validation_rmse', validation_rmse, step=epoch + 1)
 
             # Early stopping
             early_stopping(train_loss, model)
             if early_stopping.early_stop:
-                logger.info("Early stopping")
+                print("Early stopping")
                 break
 
             scheduler.step(train_loss)
 
-        # Save the trained model to MLflow
-        mlflow.pytorch.log_model(model, "models")
+            # Save metrics to a JSON file every 20 epochs
+            if (epoch + 1) % 20 == 0:
+                metrics_history = {
+                    'losses': train_losses,
+                    'rmses': rmses
+                }
+                with open(f'{METRIC_SAVE}/history_extreme_32_46.json', 'w') as f:
+                    json.dump(metrics_history, f)
 
-        # Save metrics to a JSON file every 20 epochs
-        if (epoch + 1) % 10 == 0:
-            metrics_history = {
-                'losses': train_losses,
-                'rmses': rmses
-            }
-            with open('/mnt/storage/huyekgis/brios/BRIOS/models/history/history_wdsz2_attention.json', 'w') as f:
-                json.dump(metrics_history, f)
-        
-        logger.info("Training complete and metrics saved.")
+        # Save final model to MLflow
+        mlflow.pytorch.log_model(model, "model")
+        print("Model logged to MLflow")
+
+    print("Training complete and metrics saved.")
+
 
 if __name__ == '__main__':
     trainModel()

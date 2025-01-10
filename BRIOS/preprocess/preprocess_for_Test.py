@@ -102,7 +102,28 @@ def fillNA(rvi_data_path, vh_data_path, rvi_full_path, vh_full_path):
 
 def create_json_data(dir):
     
-    def create_ndvi_time_series(folder_path, output_path):
+    def find_missing_date(list_ndvi, list_rvi):
+        dates_ndvi = [f for f in list_ndvi if f.endswith('.tif')]
+        dates_ndvi = sorted(
+            datetime.strptime(f.split('_')[1].split('.')[0], "%Y-%m-%d") for f in dates_ndvi
+        )
+    
+        dates_rvi = [f.split('.')[0].split('_')[-1] for f in list_rvi]
+    
+        dates_rvi = sorted(
+            datetime.strptime(f, "%Y-%m-%d") for f in dates_rvi
+        )
+        
+        # Chuyển danh sách về dạng set để so sánh
+        set_rvi = set(dates_rvi)
+        set_ndvi = set(dates_ndvi)
+
+        # Tìm các ngày bị thiếu trong NDVI nhưng có trong RVI
+        missing_dates = set_rvi - set_ndvi
+        print(missing_dates)
+        return list(missing_dates), dates_rvi
+            
+    def create_ndvi_time_series(folder_path, output_path, missing_dates, date_rvi):
         """
         Create a time-series NDVI dataset from a folder of raster files.
 
@@ -138,27 +159,18 @@ def create_json_data(dir):
         """
 
         # Dates with no data
-        # missing_dates = ['2023-01-05', '2023-02-06', '2023-02-14', '2023-03-26',
-        #                 '2023-04-03', '2023-04-11', '2023-04-19', '2023-04-27']
-        missing_dates = ['2024-07-07', '2024-07-15', '2024-07-23']
         missing_dates = set(missing_dates)  # Convert to set for quick lookups
 
-        # List of all available dates
-        available_files = [f for f in os.listdir(folder_path) if f.endswith('.tif')]
-        available_dates = sorted(
-            datetime.strptime(f.split('_')[1].split('.')[0], "%Y-%m-%d") for f in available_files
-        )
-
         # Check raster dimensions from a sample file
-        with rasterio.open(os.path.join(folder_path, available_files[0])) as src:
+        with rasterio.open(os.path.join(folder_path, os.listdir(folder_path)[0])) as src:
             height, width = src.shape
 
         # Initialize list to hold time series data
         time_series = []
 
         # Generate the complete list of dates, assuming an 8-day interval
-        start_date = available_dates[0]
-        end_date = available_dates[-1]
+        start_date = date_rvi[0]
+        end_date = date_rvi[-1]
         current_date = start_date
 
         while current_date <= end_date:
@@ -319,15 +331,14 @@ def create_json_data(dir):
     Step create time series data
     ndvi_timeseries.shape = (x, y, t)
     """
-    region = 'AnPhus-Pleicu-GiaLai/'
-    ndvi_raster_path = dir + region + 'anphu_ndvi8days'
-    sar_raster_path = dir + region + 'anphu_rvi_8days'
+    region = 'ThuyVan-ThaiThuy-ThaiBinh/'
+    ndvi_raster_path = dir + region + 'thuyvan_ndvi8days'
+    sar_raster_path = dir + region + 'thuyvan_rvi_8days'
     ndvi_time_series_path = dir + region + 'ndvi_timeseries.npy'
     rvi_time_series_path = dir + region + 'rvi_timeseries.npy'
     vh_time_series_path = dir + region + 'vh_timeseries.npy'
-
-    create_ndvi_time_series(folder_path=ndvi_raster_path, output_path=ndvi_time_series_path)
-
+    missing_date, date_rvi = find_missing_date(os.listdir(ndvi_raster_path), os.listdir(sar_raster_path))
+    create_ndvi_time_series(folder_path=ndvi_raster_path, output_path=ndvi_time_series_path, missing_dates=missing_date, date_rvi=date_rvi)
     create_sar_time_series(folder_path=sar_raster_path, output_rvi_path=rvi_time_series_path, output_vh_path=vh_time_series_path)
 
     fillNA(rvi_data_path=rvi_time_series_path, vh_data_path=vh_time_series_path,
@@ -511,4 +522,4 @@ def create_json_data(dir):
 # fillNA(rvi_data_path='/mnt/data1tb/brios/BRIOS/datasets/data2/rvi_timeseries.npy', vh_data_path='/mnt/data1tb/brios/BRIOS/datasets/data2/vh_timeseries.npy',
 #        rvi_full_path='/mnt/data1tb/brios/BRIOS/datasets/dataTrain/rvi_full.npy', vh_full_path='/mnt/data1tb/brios/BRIOS/datasets/dataTrain/vh_full.npy')
 
-create_json_data(dir='/mnt/storage/huyekgis/brios/RAW_TEST_Data/Data4BRIOS_TEST/')
+create_json_data(dir='/mnt/storage/code/EOV_NDVI/brios/datasets/Train_LST/')
