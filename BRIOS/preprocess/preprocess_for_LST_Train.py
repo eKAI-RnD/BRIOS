@@ -29,10 +29,12 @@ def create_json_data(dir):
         # Chuyển danh sách về dạng set để so sánh
         set_ndvi = set(date_ndvi)
         set_lst = set(date_lst)
+        #print("LST:", set_lst)
+        #print("NDVI", set_ndvi)
 
         # Tìm các ngày bị thiếu trong NDVI nhưng có trong RVI
         missing_dates = set_ndvi - set_lst
-        print(missing_dates)
+        # print(missing_dates)
         return list(missing_dates), date_ndvi
             
     def create_lst_time_series(folder_path, output_path, missing_dates, date_ndvi):
@@ -53,7 +55,7 @@ def create_json_data(dir):
 
         while current_date <= end_date:
             date_str = current_date.strftime("%Y-%m-%d")
-            file_path = os.path.join(folder_path, f"ndvi8days_{date_str}.tif") # TODO
+            file_path = os.path.join(folder_path, f"lst_{date_str}.tif") # TODO
             
             if date_str in missing_dates or not os.path.exists(file_path):
                 # Append a null array for missing dates
@@ -65,7 +67,7 @@ def create_json_data(dir):
                     time_series.append(src.read(1))  # Reads the first band
 
             # Increment by 8 days
-            current_date += timedelta(days=8)
+            current_date += timedelta(days=16)
 
         # Stack along the time dimension, then transpose to (x, y, time)
         lst_data = np.stack(time_series, axis=0).transpose(1, 2, 0)
@@ -167,16 +169,16 @@ def create_json_data(dir):
     ndvi_stack = []
     lst_stack = []
     for region in list_region:
-        child_region = (os.listdir(dir + region)[0]).split('_')[0]
+        # child_region = (os.listdir(dir + region)[0]).split('_')[0]
         
-        ndvi_raster_path = dir + region + f'/{child_region}_ndvi8days'
-        lst_raster_path = dir + region + f'/{child_region}_lst_8days'
+        ndvi_raster_path = dir + region + f'/ndvi'
+        lst_raster_path = dir + region + f'/lst'
         ndvi_time_series_path = dir + region + '/ndvi_timeseries.npy'
         lst_time_series_path = dir + region + '/lst_timeseries.npy'
         
-        missing_date = find_missing_date(os.listdir(lst_raster_path), os.listdir(ndvi_raster_path))
-        print(missing_date)
-        create_lst_time_series(folder_path=lst_raster_path, output_path=lst_time_series_path, missing_dates=missing_date)
+        missing_date, date_lst= find_missing_date(os.listdir(lst_raster_path), os.listdir(ndvi_raster_path))
+        #print(missing_date)
+        create_lst_time_series(folder_path=lst_raster_path, output_path=lst_time_series_path, missing_dates=missing_date, date_ndvi=date_lst)
         create_ndvi_time_series(folder_path=ndvi_raster_path, output_ndvi_path=ndvi_time_series_path)
 
         
@@ -186,17 +188,18 @@ def create_json_data(dir):
         lst_time_series_path = dir + region + '/lst_timeseries.npy'
         ndvi_data_ = np.load(ndvi_time_series_path)
         lst_data_ = np.load(lst_time_series_path)
-      
+        print(f'ndvi_data shape: {ndvi_data_.shape}')
+        print(f'lst data shape: {lst_data_.shape}')
         ndvi_data_ = ndvi_data_.reshape((ndvi_data_.shape[0] * ndvi_data_.shape[1], ndvi_data_.shape[2]))
         lst_data_ = lst_data_.reshape((lst_data_.shape[0] * lst_data_.shape[1], lst_data_.shape[2]))
-        print(ndvi_data_.shape)
+        #print(ndvi_data_.shape)
         ndvi_stack.append(ndvi_data_)
         lst_stack.append(lst_data_)
         
     ndvi_data = np.concatenate(ndvi_stack, axis=0)  # Kết hợp theo chiều 0 (dọc)
     lst_data = np.concatenate(lst_stack, axis=0)    # Kết hợp theo chiều 0 (dọc)
-    print(ndvi_data.shape)
-
+    #print(ndvi_data.shape)
+    # print(lst_data.shape)
     del ndvi_stack, lst_stack
     
     cloudMask = np.zeros(lst_data.shape)
@@ -210,15 +213,17 @@ def create_json_data(dir):
     Make train and valid data
     """
     data_num = np.full(lst_data.shape[0], lst_data.shape[1])
+   
     for series_index in range(cloudMask.shape[0]):
         num_ones = len(np.argwhere(cloudMask[series_index] == 1))
         data_num[series_index] -= num_ones
     
+    print('numdata: ', len(data_num>=12))
     # mask sar, 0: sar get nan, 1: fully data
-    unvalid_lst = np.where(np.isnan(lst_data).any(axis=1), 1, 0)
-    combined_mask = np.where(np.logical_or(unvalid_lst == 1), 1, 0)
-
-    index_for_train = np.where((data_num >= 25) & (combined_mask == 0))[0]
+    unvalid_ndvi = np.where(np.isnan(lst_data).any(axis=1), 1, 0)
+    print(unvalid_ndvi)
+    combined_mask = np.where((unvalid_ndvi == 1), 1, 0)
+    index_for_train = np.where((data_num >= 12))[0]
     cloudMask0 = cloudMask
 
     for series_index in index_for_train:
@@ -246,9 +251,9 @@ def create_json_data(dir):
     mask_eval = np.where(cloudmask_input == 2, 1, 0)
     # input_data = np.stack([rvi_input, vh_input, ndvi_input], axis=1)
 
-    feature_num = 3
-    n_timesteps = 46
-    time = np.arange(1,369,8) # timestep: 8
+    feature_num = 2
+    n_timesteps = 23
+    time = np.arange(1,369,16) # timestep: 8
 
     deltaT_forward = np.zeros((len(index_for_train), n_timesteps))
     for i in range(len(index_for_train)):
@@ -331,6 +336,6 @@ def create_json_data(dir):
         parse_idTrain(id_)
     fs.close()
 
-create_json_data(dir='/mnt/storage/code/EOV_NDVI/brios/datasets/Train_hiephoa/')
+create_json_data(dir='/mnt/storage/data/EOV_LST/Train_LST/Data_train_2/')
 
 

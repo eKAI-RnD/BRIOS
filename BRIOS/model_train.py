@@ -33,10 +33,16 @@ METRIC_SAVE = os.getenv('METRIC_SAVE')
 epochs = 1000
 batch_size = 1024
 hid_size = 96
-SEQ_LEN = 46
-INPUT_SIZE = 3
-SELECT_SIZE = 1
 
+# Train NDVI
+# SEQ_LEN = 46
+# INPUT_SIZE = 3
+# SELECT_SIZE = 1
+
+# Train LST
+SEQ_LEN = 23
+INPUT_SIZE = 2
+SELECT_SIZE = 1
 
 # Training process
 def trainModel():
@@ -91,8 +97,6 @@ def trainModel():
             run_loss = 0.0
             rmse = 0.0
             validnum = 0.0
-            # logging.info(f'EPOCH[{epoch}/{epochs}]')
-            # for idx, data in tqdm(enumerate(data_iter), total=len(data_iter), desc=f'EPOCH[{epoch + 1}/{epochs}]'):
             for idx, data in tqdm(enumerate(data_iter), total=len(data_iter), desc=f'EPOCH[{epoch}/{epochs}]'):
                 data = utils.to_var(data)
                 ret = model.run_on_batch(data, optimizer, epoch)
@@ -146,7 +150,7 @@ def trainModel():
                     'losses': train_losses,
                     'rmses': rmses
                 }
-                with open(f'{METRIC_SAVE}/history_extreme_32_46.json', 'w') as f:
+                with open(f'{METRIC_SAVE}/lst_test_thong_qt.json', 'w') as f:
                     json.dump(metrics_history, f)
 
         # Save final model to MLflow
