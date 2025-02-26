@@ -35,14 +35,14 @@ batch_size = 1024
 hid_size = 96
 
 # Train NDVI
-# SEQ_LEN = 46
-# INPUT_SIZE = 3
-# SELECT_SIZE = 1
+SEQ_LEN = 46
+INPUT_SIZE = 3
+SELECT_SIZE = 1
 
 # Train LST
-SEQ_LEN = 23
-INPUT_SIZE = 2
-SELECT_SIZE = 1
+# SEQ_LEN = 23
+# INPUT_SIZE = 2
+# SELECT_SIZE = 1
 
 # Training process
 def trainModel():

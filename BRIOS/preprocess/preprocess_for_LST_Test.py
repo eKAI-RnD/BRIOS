@@ -7,13 +7,101 @@ from datetime import datetime, timedelta
 import json
 
 """
-Taoj duwx lieuej 
+Step 1: fill nan value in sar data
+Step 2: fill mising data in ndvi data by nan value
+Step 3: From raster, create time series data (x, y, t)
+Step 4: Create json data include forward backward, with fields: values, deltas, masks, eval_masks
 """
 
 
 
 
+
+
+def fillNA(rvi_data_path, vh_data_path, rvi_full_path, vh_full_path):
+    """
+    Fill missing values (NaN) in RVI and VH datasets and save the results.
+
+    This function processes two datasets (RVI and VH) stored in `.npy` format. 
+    It uses a custom nanmean filter to fill missing values in a 3D array (x, y, t), 
+    applying the filter over a 7x7 spatial window for each time slice.
+    The filled datasets are saved to the specified output paths.
+
+    Parameters:
+        rvi_data_path (str): Path to the input RVI dataset in `.npy` format.
+        vh_data_path (str): Path to the input VH dataset in `.npy` format.
+        rvi_full_path (str): Path to save the filled RVI dataset in `.npy` format.
+        vh_full_path (str): Path to save the filled VH dataset in `.npy` format.
+
+    Processing Steps:
+        1. Load the RVI and VH datasets from the specified paths.
+        2. For the RVI dataset:
+           - Copy the data.
+           - Apply the nanmean filter to each time slice to fill NaN values.
+        3. For the VH dataset:
+           - Copy the data.
+           - Apply the nanmean filter to each time slice to fill NaN values.
+        4. Count and print the number of remaining NaN values after filling.
+        5. Save the processed datasets to the specified output paths.
+
+    Output:
+        - Prints the number of NaN values remaining in the VH dataset after processing.
+        - Saves the filled RVI and VH datasets to the specified output paths.
+    """
+
+    def nanmean_filter(values):
+        valid_values = values[~np.isnan(values)]
+        return np.mean(valid_values) if valid_values.size > 0 else np.nan
+
+    rvi_data = np.load(rvi_data_path)
+    vh_data = np.load(vh_data_path)
+
+    cnt = 0
+    for x in range(vh_data.shape[0]):
+        for y in range(vh_data.shape[1]):
+            for t in range(vh_data.shape[2]):
+                if np.isnan(vh_data[x, y, t]):
+                    cnt += 1
+                
+    print(f'truoc khi fill co {cnt} gia tri nan')
+
+    data = rvi_data[...,1]
+
+    filled_data = data.copy()
+    nan_positions = np.isnan(np.array(filled_data))
+    filled_data[nan_positions] = generic_filter(filled_data, nanmean_filter, size=7)[nan_positions]
+
+    rvi_filled_data = rvi_data.copy()
+    for i in tqdm(range(rvi_data.shape[2]), desc='filling rvi dataset:   '):
+        nan_pos = np.isnan(rvi_filled_data[...,i])
+        rvi_filled_data[nan_pos,i] = generic_filter(rvi_filled_data[...,i], nanmean_filter, size=7)[nan_pos]
+
+    vh_filled_data = vh_data.copy()
+    for i in tqdm(range(vh_data.shape[2]), desc='filling vh dataset:   '):
+        nan_pos_vh = np.isnan(vh_filled_data[...,i])
+        vh_filled_data[nan_pos_vh,i] = generic_filter(vh_filled_data[...,i], nanmean_filter, size=7)[nan_pos_vh]
+
+    cnt = 0
+    for x in range(vh_filled_data.shape[0]):
+        for y in range(vh_filled_data.shape[1]):
+            for t in range(vh_filled_data.shape[2]):
+                if np.isnan(vh_filled_data[x, y, t]):
+                    cnt += 1
+                
+    print(f'sau khi fill con {cnt} gia tri nan')
+
+    np.save(rvi_full_path, rvi_filled_data)
+    np.save(vh_full_path, vh_filled_data)
+
+
+
+
+
+
+
+
 def create_json_data(dir):
+    
     def find_missing_date(list_lst, list_ndvi):
         date_lst = [f for f in list_lst if f.endswith('.tif')]
         date_lst = sorted(
@@ -29,7 +117,7 @@ def create_json_data(dir):
         # Chuyển danh sách về dạng set để so sánh
         set_ndvi = set(date_ndvi)
         set_lst = set(date_lst)
-
+        
         # Tìm các ngày bị thiếu trong NDVI nhưng có trong RVI
         missing_dates = set_ndvi - set_lst
         return list(missing_dates), date_ndvi
@@ -161,72 +249,67 @@ def create_json_data(dir):
     Step create time series data
     ndvi_timeseries.shape = (x, y, t)
     """
-    
-    list_region = os.listdir(dir)
-    ndvi_stack = []
-    lst_stack = []
-    for region in list_region:        
-        ndvi_raster_path = dir + region + f'/ndvi'
-        lst_raster_path = dir + region + f'/lst'
-        ndvi_time_series_path = dir + region + '/ndvi_timeseries.npy'
-        lst_time_series_path = dir + region + '/lst_timeseries.npy'
-        
-        missing_date, date_lst= find_missing_date(os.listdir(lst_raster_path), os.listdir(ndvi_raster_path))
-        create_lst_time_series(folder_path=lst_raster_path, output_path=lst_time_series_path, missing_dates=missing_date, date_ndvi=date_lst)
-        create_ndvi_time_series(folder_path=ndvi_raster_path, output_ndvi_path=ndvi_time_series_path)
+    region = 'ThuyVan-ThaiThuy-ThaiBinh/'
+    ndvi_raster_path = dir + region + 'thuyvan_ndvi8days'
+    lst_raster_path = dir + region + 'thuyvan_rvi_8days'
+    ndvi_time_series_path = dir + region + 'ndvi_timeseries.npy'
+    lst_time_series_path = dir + region + 'rvi_timeseries.npy'
+    missing_date, date_lst= find_missing_date(os.listdir(lst_raster_path), os.listdir(ndvi_raster_path))
+    create_lst_time_series(folder_path=lst_raster_path, output_path=lst_time_series_path, missing_dates=missing_date, date_ndvi=date_lst)
+    create_ndvi_time_series(folder_path=ndvi_raster_path, output_ndvi_path=ndvi_time_series_path)
 
-        
 
-    for region in tqdm(list_region, desc="load region: "):
-        ndvi_time_series_path = dir + region + '/ndvi_timeseries.npy'
-        lst_time_series_path = dir + region + '/lst_timeseries.npy'
-        ndvi_data_ = np.load(ndvi_time_series_path)
-        lst_data_ = np.load(lst_time_series_path)
-        print(f'ndvi_data shape: {ndvi_data_.shape}')
-        print(f'lst data shape: {lst_data_.shape}')
-        ndvi_data_ = ndvi_data_.reshape((ndvi_data_.shape[0] * ndvi_data_.shape[1], ndvi_data_.shape[2]))
-        lst_data_ = lst_data_.reshape((lst_data_.shape[0] * lst_data_.shape[1], lst_data_.shape[2]))
-        #print(ndvi_data_.shape)
-        ndvi_stack.append(ndvi_data_)
-        lst_stack.append(lst_data_)
-        
-    ndvi_data = np.concatenate(ndvi_stack, axis=0)  # Kết hợp theo chiều 0 (dọc)
-    lst_data = np.concatenate(lst_stack, axis=0)    # Kết hợp theo chiều 0 (dọc)
-    
-    del ndvi_stack, lst_stack
-    
-    cloudMask = np.zeros(lst_data.shape)
+    ndvi_data = np.load(ndvi_time_series_path)
+    lst_data = np.load(lst_time_series_path)
 
-    for series_index in range(lst_data.shape[0]):
-        for time_step in range(lst_data.shape[1]):
-            if np.isnan(lst_data[series_index, time_step]):
+    """
+    save coordinate x y t
+    """
+    x, y, t = ndvi_data.shape
+    coordinates = np.array([(i, j) for i in range(x) for j in range(y)])
+    np.save(dir + region + 'coordinates.npy', coordinates)
+
+
+    ndvi_data = ndvi_data.reshape((ndvi_data.shape[0] * ndvi_data.shape[1], ndvi_data.shape[2]))
+    lst_data = lst_data.reshape((lst_data.shape[0] * lst_data.shape[1], lst_data.shape[2]))
+
+
+
+    """
+    Step make cloudmask
+    - `ndvi_data[i]` == `np.nan` => have cloud
+    - `cloudMask[i] = 0`: no cloud 
+    - `cloudMask[i]` = 1: cloud
+    """
+    cloudMask = np.zeros(ndvi_data.shape)
+
+    for series_index in range(ndvi_data.shape[0]):
+        for time_step in range(ndvi_data.shape[1]):
+            if np.isnan(ndvi_data[series_index, time_step]):
                 cloudMask[series_index, time_step] = 1
 
     """
     Make train and valid data
     """
-    data_num = np.full(lst_data.shape[0], lst_data.shape[1])
-   
-    for series_index in range(cloudMask.shape[0]):
-        num_ones = len(np.argwhere(cloudMask[series_index] == 1))
-        data_num[series_index] -= num_ones
+    data_num = np.full(ndvi_data.shape[0], ndvi_data.shape[1])
+    # for series_index in range(cloudMask.shape[0]):
+    #     num_ones = len(np.argwhere(cloudMask[series_index] == 1))
+    #     data_num[series_index] -= num_ones
     
-    print('numdata: ', len(data_num>=12))
     # mask sar, 0: sar get nan, 1: fully data
-    unvalid_ndvi = np.where(np.isnan(lst_data).any(axis=1), 1, 0)
-    print(unvalid_ndvi)
-    combined_mask = np.where((unvalid_ndvi == 1), 1, 0)
-    index_for_train = np.where((data_num >= 12))[0]
+    unvalid_ndvi = np.where(np.isnan(ndvi_data).any(axis=1), 1, 0)
+
+    index_for_train = [i for i in range(ndvi_data.shape[0])]
     cloudMask0 = cloudMask
 
-    for series_index in index_for_train:
-        uncloud_index = np.where(cloudMask0[series_index] == 0)[0]
-        fakecloud_index = choose_data_validate(uncloud_index)
-        cloudMask0[series_index, fakecloud_index] = 2
+    # for series_index in index_for_train:
+    #     uncloud_index = np.where(cloudMask0[series_index] == 0)[0]
+    #     fakecloud_index = choose_data_validate(uncloud_index)
+    #     cloudMask0[series_index, fakecloud_index] = 2
 
 
     ndvi_input = ndvi_data[index_for_train]
-    lst_input = lst_data[index_for_train]
+    lst_input = lst_input[index_for_train]
     cloudmask_input = cloudMask0[index_for_train]
 
     print(f"ndvi_input: {ndvi_data}")
@@ -234,6 +317,7 @@ def create_json_data(dir):
     print(f"index for train: {len(index_for_train)}")
     print(f"ndvi input shape: {ndvi_input.shape}")
     print(f"lst input shape: {lst_input.shape}")
+
     """
     have dataset contains: 
     - input data: [rvi, vh, ndvi] (n_series, n_features, n_timesteps)
@@ -244,7 +328,7 @@ def create_json_data(dir):
     mask_eval = np.where(cloudmask_input == 2, 1, 0)
     # input_data = np.stack([rvi_input, vh_input, ndvi_input], axis=1)
 
-    feature_num = 2
+    feature_num = 3
     n_timesteps = 46
     time = np.arange(1,737,16) # timestep: 8
 
@@ -268,6 +352,12 @@ def create_json_data(dir):
         maskone = np.int_(maskone)
         done = cal_timestep(time, maskone)
         deltaTt[i, :] = done
+
+    # ndvi_input_backward = ndvi_input[:, ::-1]
+    # rvi_input_backward = rvi_input[:, ::-1]
+    # vh_input_backward = vh_input[:, ::-1]
+
+    # input_data_backward = np.stack([rvi_input_backward, vh_input_backward, ndvi_input_backward], axis=1)
 
 
     """
@@ -298,7 +388,7 @@ def create_json_data(dir):
             traindatasets_evalmask[step, series_index] = mask_eval[series_index, step]
     traindatasets_evalmaskF = np.concatenate((traindatasets_evalmaskF, traindatasets_evalmask), axis=1)
 
-    print('Generate mask train: ')
+    print('Generate mask tran: ')
     traindatasets_mask = np.zeros((n_timesteps, len(index_for_train)), dtype=np.int8)
     for step in range(n_timesteps):
         for series_index in range(len(index_for_train)):
@@ -322,13 +412,13 @@ def create_json_data(dir):
     traindatasets_deltaBF = np.concatenate((traindatasets_deltaBF, traindatasets_delta_backward), axis=2)
 
 
-    fs = open(dir + 'training_data.json', 'w')
+    fs = open(dir + region + 'training_data.json', 'w')
     all_len = traindatasets_valuesF.shape[2]
     print('Save training dataset as JSON: ')
     for id_ in tqdm(range(all_len)):
         parse_idTrain(id_)
     fs.close()
 
-create_json_data(dir='/mnt/storage/data/EOV_LST/Train_LST/New_Brios')
 
 
+create_json_data(dir='/mnt/storage/code/EOV_NDVI/brios/datasets/Train_LST/')

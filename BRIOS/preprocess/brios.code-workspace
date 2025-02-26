@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"path": "../../../../../data/EOV_LST/Train_LST/Data_train_2"
+		},
+		{
+			"path": "../../../../../data/EOV_LST/Train_LST/Data_train_1"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"random": "cpp"
+		},
+		"git.ignoreLimitWarning": true
+	}
+}
