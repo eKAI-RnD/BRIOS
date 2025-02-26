@@ -118,10 +118,10 @@ def create_json_data(dir):
 
         # Tìm các ngày bị thiếu trong NDVI nhưng có trong RVI
         missing_dates = set_rvi - set_ndvi
-        print(missing_dates)
+        # print(missing_dates)
         return list(missing_dates), dates_rvi
             
-    def create_ndvi_time_series(folder_path, output_path, missing_dates, date_rvi):
+    def create_ndvi_time_series(folder_path, output_path, missing_dates):
         """
         Create a time-series NDVI dataset from a folder of raster files.
 
@@ -157,7 +157,10 @@ def create_json_data(dir):
         """
 
         # Dates with no data
-        missing_dates = set(missing_dates)  # Convert to set for quick lookups
+        # print("MISSSING DATES:", missing_dates)
+        # flat_missing_dates = missing_dates[0] + missing_dates[1]
+        missing_dates = set(missing_dates[1])  # Convert to set for quick lookups
+        
 
         # Check raster dimensions from a sample file
         with rasterio.open(os.path.join(folder_path, os.listdir(folder_path)[0])) as src:
@@ -167,8 +170,8 @@ def create_json_data(dir):
         time_series = []
 
         # Generate the complete list of dates, assuming an 8-day interval
-        start_date = date_rvi[0]
-        end_date = date_rvi[-1]
+        start_date = datetime.strptime("2023-01-01", "%Y-%m-%d")
+        end_date = datetime.strptime("2025-01-01", "%Y-%m-%d")
         current_date = start_date
 
         while current_date <= end_date:
@@ -185,14 +188,14 @@ def create_json_data(dir):
                     time_series.append(src.read(1))  # Reads the first band
 
             # Increment by 8 days
-            current_date += timedelta(days=8)
+            current_date += timedelta(days=16)
 
         # Stack along the time dimension, then transpose to (x, y, time)
         ndvi_data = np.stack(time_series, axis=0).transpose(1, 2, 0)
 
         np.save(output_path, ndvi_data)
 
-        print(f"Data saved to {output_path}")
+        # print(f"Data saved to {output_path}")
 
     
     def create_sar_time_series(folder_path, output_rvi_path, output_vh_path):
@@ -334,8 +337,10 @@ def create_json_data(dir):
     ndvi_stack = []
     rvi_stack = []
     vh_stack = []
-    for region in list_region:
-        child_region = (os.listdir(dir + region)[0]).split('_')[0]
+    print(list_region)
+    for region in list_region[11:]:
+        child_region = ((dir + region).split("/")[-1].split("-")[0].lower()).split('_')[0]
+        print(child_region)
         
         ndvi_raster_path = dir + region + f'/{child_region}_ndvi8days'
         sar_raster_path = dir + region + f'/{child_region}_rvi_8days'
@@ -344,7 +349,7 @@ def create_json_data(dir):
         vh_time_series_path = dir + region + '/vh_timeseries.npy'
         
         missing_date = find_missing_date(os.listdir(ndvi_raster_path), os.listdir(sar_raster_path))
-        print(missing_date)
+        # print(missing_date)
         create_ndvi_time_series(folder_path=ndvi_raster_path, output_path=ndvi_time_series_path, missing_dates=missing_date)
         create_sar_time_series(folder_path=sar_raster_path, output_rvi_path=rvi_time_series_path, output_vh_path=vh_time_series_path)
 
@@ -439,7 +444,7 @@ def create_json_data(dir):
 
     feature_num = 3
     n_timesteps = 46
-    time = np.arange(1,369,8) # timestep: 8
+    time = np.arange(1,737,16) # timestep: 8
 
     deltaT_forward = np.zeros((len(index_for_train), n_timesteps))
     for i in range(len(index_for_train)):
@@ -540,4 +545,4 @@ def create_json_data(dir):
 # fillNA(rvi_data_path='/mnt/data1tb/brios/BRIOS/datasets/data2/rvi_timeseries.npy', vh_data_path='/mnt/data1tb/brios/BRIOS/datasets/data2/vh_timeseries.npy',
 #        rvi_full_path='/mnt/data1tb/brios/BRIOS/datasets/dataTrain/rvi_full.npy', vh_full_path='/mnt/data1tb/brios/BRIOS/datasets/dataTrain/vh_full.npy')
 
-create_json_data(dir='/mnt/storage/code/EOV_NDVI/brios/datasets/Train_hiephoa/')
+create_json_data(dir='/mnt/storage/data/EOV_LST/Train_LST/New_Brios/')
