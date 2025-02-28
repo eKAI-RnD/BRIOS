@@ -338,7 +338,7 @@ def create_json_data(dir):
     rvi_stack = []
     vh_stack = []
     print(list_region)
-    for region in list_region[11:]:
+    for region in list_region[:0]:
         child_region = ((dir + region).split("/")[-1].split("-")[0].lower()).split('_')[0]
         print(child_region)
         
@@ -363,7 +363,7 @@ def create_json_data(dir):
 
     # fillNA(rvi_data_path=rvi_time_series_path, vh_data_path=vh_time_series_path,
     # rvi_full_path=rvi_time_series_path, vh_full_path=vh_time_series_path)
-    for region in tqdm(list_region, desc="load region: "):
+    for region in tqdm(list_region[:1], desc="load region: "):
         ndvi_time_series_path = dir + region + '/ndvi_timeseries.npy'
         rvi_time_series_path = dir + region + '/rvi_timeseries.npy'
         vh_time_series_path = dir + region + '/vh_timeseries.npy'
@@ -529,7 +529,7 @@ def create_json_data(dir):
     traindatasets_deltaBF = np.concatenate((traindatasets_deltaBF, traindatasets_delta_backward), axis=2)
 
 
-    fs = open(dir + 'training_data.json', 'w')
+    fs = open(dir + 'training_data2.json', 'w')
     all_len = traindatasets_valuesF.shape[2]
     print('Save training dataset as JSON: ')
     for id_ in tqdm(range(all_len)):
